@@ -23,7 +23,7 @@
 - [Team Members](#-team-members)
 - [License](#-license)
 
-## 🌪 The Problem
+##  The Problem
 
 In the critical first 72 hours after a major disaster, response efforts are defined by chaos. Information is fragmented across countless sources, communication networks are unreliable, and situational awareness for command centers is close to zero. This "information latency" costs time, resources, and ultimately, lives.
 
