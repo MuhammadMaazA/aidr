@@ -1,4 +1,4 @@
-# 🚀 Project AIDR: Agent-driven Integrated Disaster Response
+# Project AIDR: Agent-driven Integrated Disaster Response
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Status: In Development](https://img.shields.io/badge/status-in_development-orange.svg)](https://github.com/your-username/project-aidr)
