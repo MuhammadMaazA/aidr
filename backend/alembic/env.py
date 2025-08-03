@@ -31,7 +31,7 @@ target_metadata = Base.metadata
 # ... etc.
 
 def get_url():
-    return settings.DATABASE_URL
+    return settings.database_url
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
