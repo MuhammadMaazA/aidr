@@ -5,8 +5,8 @@ from .core.config import settings
 from .core.database import engine
 from .models import disaster
 
-# Create database tables
-disaster.Base.metadata.create_all(bind=engine)
+# Create database tables (commented out since we created them manually)
+# disaster.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Project AIDR API",

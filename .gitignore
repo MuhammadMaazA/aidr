@@ -86,18 +86,39 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-# Docker
+# Docker (keeping for reference, not currently used)
 .dockerignore
+docker-compose.override.yml
 
-# Alembic
-backend/alembic/versions/*.py
-!backend/alembic/versions/__init__.py
+# Alembic (keep migration files but ignore temporary ones)
+backend/alembic/env.py.bak
+backend/alembic/script.py.mako.bak
+backend/alembic/versions/*.pyc
+backend/alembic/versions/__pycache__/
 
 # Temporary files
 *.tmp
 *.temp
 *.bak
 *.backup
+*.orig
+
+# Python development
+.python-version
+.pyenv
+pyrightconfig.json
+
+# Development artifacts
+backend/create_tables.py
+
+# Extra API token safety
+mapbox_token.txt
+openai_token.txt
+**/mapbox_key.txt
+**/openai_key.txt
+
+# Local development
+.local/
 
 # Coverage reports
 htmlcov/

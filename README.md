@@ -54,7 +54,7 @@ AIDR is built on a modern, scalable technology stack designed for real-time data
 | **AI / LLM Services**| OpenAI GPT-4 API |
 | **Database** | PostgreSQL with PostGIS extension |
 | **Real-time Communication** | WebSockets |
-| **Deployment** | Docker, Google Cloud Run (Backend), Vercel (Frontend) |
+| **Deployment** | Local PostgreSQL, Vercel (Frontend), Heroku/Railway (Backend) |
 
 ### System Architecture
 
@@ -70,47 +70,84 @@ Follow these instructions to get a local copy of Project AIDR up and running for
 
 - **Node.js**: `v18.0` or later
 - **Python**: `v3.10` or later
-- **Docker** & **Docker Compose**: For running the database
+- **PostgreSQL**: `v15` or later with PostGIS extension
 - **An OpenAI API Key**
 
 ### Installation
 
 1.  **Clone the repository:**
     ```sh
-    git clone https://github.com/your-username/project-aidr.git
-    cd project-aidr
+    git clone https://github.com/MuhammadMaazA/aidr.git
+    cd aidr
     ```
 
-2.  **Set up Environment Variables:**
+2.  **Setup PostgreSQL Database:**
+    
+    **Install PostgreSQL (if not already installed):**
+    - **Windows**: Download from [PostgreSQL Official Site](https://www.postgresql.org/download/windows/)
+    - **macOS**: `brew install postgresql`
+    - **Linux**: `sudo apt-get install postgresql postgresql-contrib`
+
+    **Install PostGIS Extension:**
+    - **Windows**: Download PostGIS bundle from [PostGIS Downloads](https://postgis.net/windows_downloads/)
+    - **macOS**: `brew install postgis`
+    - **Linux**: `sudo apt-get install postgis postgresql-15-postgis-3`
+
+    **Create Database and User:**
+    ```sh
+    # Connect to PostgreSQL (replace 'postgres' with your username if different)
+    psql -U postgres
+    
+    # Create database and user
+    CREATE DATABASE aidr_db;
+    CREATE USER aidr_user WITH PASSWORD 'your_password_here';
+    GRANT ALL PRIVILEGES ON DATABASE aidr_db TO aidr_user;
+    
+    # Connect to the new database
+    \c aidr_db
+    
+    # Enable PostGIS extension
+    CREATE EXTENSION IF NOT EXISTS postgis;
+    
+    # Exit psql
+    \q
+    ```
+
+3.  **Set up Environment Variables:**
     You will need to create two `.env` files for your credentials.
 
-    *   **Backend:** Create a file at `backend/.env` and add the following:
-        ```env
-        # backend/.env.example
-        DATABASE_URL=postgresql://user:password@localhost:5432/aidr_db
-        OPENAI_API_KEY="sk-..."
-        ```
-    *   **Frontend:** Create a file at `frontend/.env.local` and add your Mapbox token:
-        ```env
-        # frontend/.env.local.example
-        VITE_MAPBOX_TOKEN="pk.eyJ..."
-        ```
-
-3.  **Setup Database:**
-    The simplest way to run a local PostgreSQL + PostGIS database is with Docker.
-    ```sh
-    # From the root directory of the project
-    docker-compose up -d
+    **Backend:** Create a file at `backend/.env`:
+    ```env
+    # Replace with your actual database password and OpenAI API key
+    DATABASE_URL=postgresql://aidr_user:your_password_here@localhost:5432/aidr_db
+    OPENAI_API_KEY="sk-your-openai-api-key-here"
     ```
-    *(Note: You will need to add a `docker-compose.yml` file for this. See an example [here](https://hub.docker.com/r/postgis/postgis/).)*
+
+    **Frontend:** Create a file at `frontend/.env.local`:
+    ```env
+    # Get your Mapbox token from https://account.mapbox.com/access-tokens/
+    VITE_MAPBOX_TOKEN="pk.your-mapbox-token-here"
+    ```
 
 4.  **Setup Backend:**
     ```sh
     cd backend
     python -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+    
+    # Activate virtual environment
+    # On Windows:
+    venv\Scripts\activate
+    # On macOS/Linux:
+    source venv/bin/activate
+    
+    # Install dependencies
     pip install -r requirements.txt
-    alembic upgrade head      # To run database migrations
+    
+    # Install PostGIS support for Python
+    pip install geoalchemy2
+    
+    # Create database tables
+    python create_tables_direct.py
     ```
 
 5.  **Setup Frontend:**
@@ -121,20 +158,20 @@ Follow these instructions to get a local copy of Project AIDR up and running for
 
 ##  How to Run
 
-1.  **Start the Database:** Make sure your Docker container for PostgreSQL is running.
-    ```sh
-    docker-compose up -d
-    ```
-
-2.  **Start the Backend Server:**
+1.  **Start the Backend Server:**
     ```sh
     cd backend
+    # Activate virtual environment
+    # On Windows:
+    venv\Scripts\activate
+    # On macOS/Linux:
     source venv/bin/activate
+    
     uvicorn app.main:app --reload
     ```
     The backend will be running on `http://127.0.0.1:8000`.
 
-3.  **Start the Frontend Application:**
+2.  **Start the Frontend Application:**
     In a new terminal:
     ```sh
     cd frontend
@@ -142,13 +179,42 @@ Follow these instructions to get a local copy of Project AIDR up and running for
     ```
     The frontend will be accessible at `http://127.0.0.1:5173`.
 
-4.  **Run the AI Agents:**
+3.  **Run the AI Agents:**
     The agents are scripts that run alongside the server. In a new terminal:
     ```sh
     cd backend
+    # Activate virtual environment
+    # On Windows:
+    venv\Scripts\activate
+    # On macOS/Linux:
     source venv/bin/activate
+    
     python -m agents.social_media_agent  # To run the social media scan
+    python -m agents.damage_assessment_agent  # To run damage analysis
+    python -m agents.resource_planning_agent  # To run resource planning
     ```
+
+## 🔧 Troubleshooting
+
+### Database Connection Issues
+- **PostgreSQL not running**: Start PostgreSQL service on your system
+- **Password authentication failed**: Ensure the password in your `.env` file matches your PostgreSQL user password
+- **PostGIS extension missing**: Run `CREATE EXTENSION IF NOT EXISTS postgis;` in your database
+
+### Tables Not Created
+If you encounter table-related errors, manually create tables:
+```sh
+cd backend
+python create_tables_direct.py
+```
+
+### URL Encoding for Special Characters
+If your PostgreSQL password contains special characters like `#`, `@`, `%`, etc., you need to URL encode them:
+- `#` becomes `%23`
+- `@` becomes `%40`
+- `%` becomes `%25`
+
+Example: If password is `mypass#123`, use `mypass%23123` in the DATABASE_URL.
 
 ## 📂 Project Structure
 
