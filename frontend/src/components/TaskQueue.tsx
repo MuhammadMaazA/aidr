@@ -27,8 +27,7 @@ const TaskQueue: React.FC = () => {
 
   const handleStatusChange = async (taskId: number, newStatus: string) => {
     try {
-      updateTaskStatus(taskId, newStatus)
-      // The API call will be handled by the store or could be added here
+      await updateTaskStatus(taskId, newStatus)
     } catch (error) {
       console.error('Failed to update task status:', error)
     }
@@ -95,6 +94,19 @@ const TaskQueue: React.FC = () => {
           marginBottom: '8px'
         }}>
           {task.description}
+        </div>
+      )}
+
+      {task.assigned_resources && (
+        <div style={{
+          fontSize: '12px',
+          color: '#059669',
+          marginBottom: '8px',
+          padding: '4px 8px',
+          backgroundColor: '#d1fae5',
+          borderRadius: '4px'
+        }}>
+          🎯 Resources: {task.assigned_resources}
         </div>
       )}
 

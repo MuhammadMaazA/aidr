@@ -1,14 +1,16 @@
 import React, { useState } from 'react'
 import { useStore } from '../state/store'
 import AgentStatusPanel from './AgentStatusPanel'
+import AgentControlPanel from './AgentControlPanel'
 import TaskQueue from './TaskQueue'
 import DamageReports from './DamageReports'
 
 const Sidebar: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'agents' | 'tasks' | 'reports'>('agents')
+  const [activeTab, setActiveTab] = useState<'control' | 'agents' | 'tasks' | 'reports'>('control')
 
   const tabs = [
-    { id: 'agents', label: 'AI Agents', icon: '🤖' },
+    { id: 'control', label: 'Control', icon: '🎛️' },
+    { id: 'agents', label: 'Status', icon: '🤖' },
     { id: 'tasks', label: 'Tasks', icon: '📋' },
     { id: 'reports', label: 'Reports', icon: '📊' }
   ]
@@ -53,6 +55,7 @@ const Sidebar: React.FC = () => {
         overflow: 'auto',
         padding: '16px'
       }}>
+        {activeTab === 'control' && <AgentControlPanel />}
         {activeTab === 'agents' && <AgentStatusPanel />}
         {activeTab === 'tasks' && <TaskQueue />}
         {activeTab === 'reports' && <DamageReports />}

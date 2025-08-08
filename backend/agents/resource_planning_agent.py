@@ -31,7 +31,14 @@ class ResourcePlanningAgent:
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(f"{self.api_base_url}/tasks/")
+                response.raise_for_status()  # Raise an exception for bad status codes
                 return response.json()
+            except httpx.HTTPStatusError as e:
+                print(f"HTTP error fetching tasks: {e.response.status_code} - {e.response.text}")
+                return []
+            except json.JSONDecodeError as e:
+                print(f"JSON decode error fetching tasks: {e}")
+                return []
             except Exception as e:
                 print(f"Failed to fetch tasks: {e}")
                 return []
@@ -41,7 +48,14 @@ class ResourcePlanningAgent:
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(f"{self.api_base_url}/resources/")
+                response.raise_for_status()  # Raise an exception for bad status codes
                 return response.json()
+            except httpx.HTTPStatusError as e:
+                print(f"HTTP error fetching resources: {e.response.status_code} - {e.response.text}")
+                return []
+            except json.JSONDecodeError as e:
+                print(f"JSON decode error fetching resources: {e}")
+                return []
             except Exception as e:
                 print(f"Failed to fetch resources: {e}")
                 return []
@@ -114,25 +128,42 @@ class ResourcePlanningAgent:
             task_id = allocation.get("task_id")
             resource_ids = allocation.get("resource_ids", [])
             
-            # Update task with assigned resources
+            # Assign resources to task
             async with httpx.AsyncClient() as client:
                 try:
+                    # Create resource names list for display
+                    resource_names = []
+                    for res_id in resource_ids:
+                        # Get resource details (this is for display purposes)
+                        resource_types = {1: "Emergency Team", 2: "Medical Unit", 3: "Rescue Equipment", 
+                                        4: "Emergency Team", 5: "Medical Unit", 6: "Rescue Equipment",
+                                        7: "Emergency Team", 8: "Medical Unit", 9: "Rescue Equipment"}
+                        resource_names.append(resource_types.get(res_id, f"Resource {res_id}"))
+                    
+                    # Assign resources to the task
+                    await client.put(
+                        f"{self.api_base_url}/tasks/{task_id}/assign",
+                        json={"resource_ids": resource_ids}
+                    )
+                    
+                    # Also update status to assigned
                     await client.put(
                         f"{self.api_base_url}/tasks/{task_id}",
-                        params={"status": "in_progress"}
+                        params={"status": "assigned"}
                     )
                     
                     await self.send_agent_update(
                         "task_assigned",
-                        f"Task {task_id} assigned to resources {resource_ids}",
+                        f"Task {task_id} assigned to: {', '.join(resource_names)}",
                         {
                             "task_id": task_id,
                             "resource_ids": resource_ids,
+                            "resource_names": resource_names,
                             "efficiency": allocation.get("efficiency_score", 0)
                         }
                     )
                 except Exception as e:
-                    print(f"Failed to update task {task_id}: {e}")
+                    print(f"Failed to assign resources to task {task_id}: {e}")
     
     async def create_emergency_resources(self):
         """Create some emergency resources if none exist"""
@@ -179,22 +210,29 @@ class ResourcePlanningAgent:
     
     async def run_planning_cycle(self):
         """Run a complete resource planning cycle"""
+        print("🤖 Resource Planning Agent starting...")
         await self.send_agent_update("active", "Resource Planning Agent started")
         
         try:
             # Ensure we have some resources
+            print("🏗️ Creating emergency resources...")
             await self.create_emergency_resources()
             
             # Fetch current tasks and resources
+            print("📋 Fetching tasks and resources...")
             await self.send_agent_update("processing", "Fetching tasks and resources...")
             
             tasks = await self.get_tasks()
             resources = await self.get_resources()
             
+            print(f"📊 Found {len(tasks)} tasks and {len(resources)} resources")
+            
             if not tasks:
+                print("⏳ No tasks found. Waiting for assignments...")
                 await self.send_agent_update("waiting", "No tasks found. Waiting for assignments...")
                 return
             
+            print(f"🧮 Optimizing allocation for {len(tasks)} tasks and {len(resources)} resources...")
             await self.send_agent_update(
                 "optimizing", 
                 f"Optimizing allocation for {len(tasks)} tasks and {len(resources)} resources..."
@@ -202,8 +240,10 @@ class ResourcePlanningAgent:
             
             # Optimize resource allocation
             allocation_plan = self.optimize_resource_allocation(tasks, resources)
+            print(f"📋 Allocation plan: {allocation_plan}")
             
             if allocation_plan.get("allocations"):
+                print(f"✅ Allocation plan ready. Efficiency: {allocation_plan.get('overall_efficiency', 0):.2f}")
                 await self.send_agent_update(
                     "plan_ready",
                     f"Allocation plan ready. Efficiency: {allocation_plan.get('overall_efficiency', 0):.2f}",
@@ -214,28 +254,37 @@ class ResourcePlanningAgent:
                 )
                 
                 # Execute the allocation plan
+                print("🚀 Executing resource allocation plan...")
                 await self.send_agent_update("executing", "Executing resource allocation plan...")
                 await self.execute_allocation_plan(allocation_plan)
                 
+                print(f"🎯 Successfully allocated resources to {len(allocation_plan.get('allocations', []))} tasks")
                 await self.send_agent_update(
                     "allocation_complete",
                     f"Successfully allocated resources to {len(allocation_plan.get('allocations', []))} tasks"
                 )
             else:
+                print("❌ No optimal allocations found")
                 await self.send_agent_update("no_allocation", "No optimal allocations found")
                 
         except Exception as e:
+            print(f"❌ Planning error: {str(e)}")
             await self.send_agent_update("error", f"Planning error: {str(e)}")
         
+        print("🏁 Resource planning cycle completed")
         await self.send_agent_update("completed", "Resource planning cycle completed")
 
 async def main():
     agent = ResourcePlanningAgent()
+    print("🚀 Starting Resource Planning Agent...")
     
-    # Run planning cycles every 90 seconds
-    while True:
-        await agent.run_planning_cycle()
-        await asyncio.sleep(90)
+    # Run a single planning cycle for testing
+    await agent.run_planning_cycle()
+    
+    # Uncomment below for continuous operation
+    # while True:
+    #     await agent.run_planning_cycle()
+    #     await asyncio.sleep(90)
 
 if __name__ == "__main__":
     asyncio.run(main())

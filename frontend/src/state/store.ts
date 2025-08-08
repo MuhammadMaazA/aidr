@@ -98,7 +98,7 @@ interface Store {
   disconnectWebSocket: () => void
 }
 
-const API_BASE = '/api/v1'
+const API_BASE = 'http://127.0.0.1:8000/api/v1'
 
 export const useStore = create<Store>((set, get) => ({
   // Initial state
@@ -139,11 +139,22 @@ export const useStore = create<Store>((set, get) => ({
     tasks: [...state.tasks, task]
   })),
 
-  updateTaskStatus: (taskId, status) => set((state) => ({
-    tasks: state.tasks.map(task => 
-      task.id === taskId ? { ...task, status } : task
-    )
-  })),
+  updateTaskStatus: async (taskId, status) => {
+    try {
+      // Update backend
+      await axios.put(`${API_BASE}/tasks/${taskId}?status=${status}`)
+      
+      // Update local state
+      set((state) => ({
+        tasks: state.tasks.map(task => 
+          task.id === taskId ? { ...task, status } : task
+        )
+      }))
+    } catch (error) {
+      console.error('Failed to update task status:', error)
+      get().setError('Failed to update task status')
+    }
+  },
 
   // API Actions
   fetchInitialData: async () => {
@@ -186,8 +197,8 @@ export const useStore = create<Store>((set, get) => ({
       existingWs.close()
     }
     
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/api/v1/ws`
+    // Connect to backend WebSocket
+    const wsUrl = 'ws://127.0.0.1:8000/api/v1/ws'
     
     const ws = new WebSocket(wsUrl)
     

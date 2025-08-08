@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text
 from ..models.disaster import DisasterEvent, DamageReport, Resource, Task
 from ..schemas.disaster import (
     DisasterEventCreate, DamageReportCreate, ResourceCreate, TaskCreate
@@ -73,7 +73,7 @@ def get_damage_reports(db: Session, skip: int = 0, limit: int = 100):
     reports = db.query(DamageReport).offset(skip).limit(limit).all()
     for report in reports:
         coord = db.execute(
-            f"SELECT ST_X(location::geometry) as lng, ST_Y(location::geometry) as lat FROM damage_reports WHERE id = {report.id}"
+            text(f"SELECT ST_X(location::geometry) as lng, ST_Y(location::geometry) as lat FROM damage_reports WHERE id = {report.id}")
         ).first()
         if coord:
             report.latitude = coord.lat
@@ -103,7 +103,7 @@ def get_resources(db: Session, skip: int = 0, limit: int = 100):
     resources = db.query(Resource).offset(skip).limit(limit).all()
     for resource in resources:
         coord = db.execute(
-            f"SELECT ST_X(location::geometry) as lng, ST_Y(location::geometry) as lat FROM resources WHERE id = {resource.id}"
+            text(f"SELECT ST_X(location::geometry) as lng, ST_Y(location::geometry) as lat FROM resources WHERE id = {resource.id}")
         ).first()
         if coord:
             resource.latitude = coord.lat
@@ -136,7 +136,7 @@ def get_tasks(db: Session, skip: int = 0, limit: int = 100):
     tasks = db.query(Task).offset(skip).limit(limit).all()
     for task in tasks:
         coord = db.execute(
-            f"SELECT ST_X(location::geometry) as lng, ST_Y(location::geometry) as lat FROM tasks WHERE id = {task.id}"
+            text(f"SELECT ST_X(location::geometry) as lng, ST_Y(location::geometry) as lat FROM tasks WHERE id = {task.id}")
         ).first()
         if coord:
             task.latitude = coord.lat
@@ -152,7 +152,25 @@ def update_task_status(db: Session, task_id: int, status: str):
         
         # Add coordinates
         coord = db.execute(
-            f"SELECT ST_X(location::geometry) as lng, ST_Y(location::geometry) as lat FROM tasks WHERE id = {task_id}"
+            text(f"SELECT ST_X(location::geometry) as lng, ST_Y(location::geometry) as lat FROM tasks WHERE id = {task_id}")
+        ).first()
+        if coord:
+            db_task.latitude = coord.lat
+            db_task.longitude = coord.lng
+    return db_task
+
+def assign_resources_to_task(db: Session, task_id: int, assigned_resources: str):
+    """Assign resources to a task"""
+    db_task = db.query(Task).filter(Task.id == task_id).first()
+    if db_task:
+        db_task.assigned_resources = assigned_resources
+        db_task.status = "assigned"  # Update status to indicate resources are assigned
+        db.commit()
+        db.refresh(db_task)
+        
+        # Add coordinates
+        coord = db.execute(
+            text(f"SELECT ST_X(location::geometry) as lng, ST_Y(location::geometry) as lat FROM tasks WHERE id = {task_id}")
         ).first()
         if coord:
             db_task.latitude = coord.lat
