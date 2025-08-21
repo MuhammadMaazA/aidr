@@ -158,3 +158,21 @@ def update_task_status(db: Session, task_id: int, status: str):
             db_task.latitude = coord.lat
             db_task.longitude = coord.lng
     return db_task
+
+def assign_resources_to_task(db: Session, task_id: int, assigned_resources: str):
+    """Assign resources to a task"""
+    db_task = db.query(Task).filter(Task.id == task_id).first()
+    if db_task:
+        db_task.assigned_resources = assigned_resources
+        db_task.status = "assigned"  # Update status to indicate resources are assigned
+        db.commit()
+        db.refresh(db_task)
+        
+        # Add coordinates
+        coord = db.execute(
+            text(f"SELECT ST_X(location::geometry) as lng, ST_Y(location::geometry) as lat FROM tasks WHERE id = {task_id}")
+        ).first()
+        if coord:
+            db_task.latitude = coord.lat
+            db_task.longitude = coord.lng
+    return db_task

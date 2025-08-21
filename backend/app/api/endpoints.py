@@ -51,19 +51,22 @@ def read_disaster(disaster_id: int, db: Session = Depends(get_db)):
 
 # Damage Reports
 @router.post("/damage-reports/", response_model=schemas.DamageReport)
-def create_damage_report(report: schemas.DamageReportCreate, db: Session = Depends(get_db)):
+async def create_damage_report(report: schemas.DamageReportCreate, db: Session = Depends(get_db)):
     db_report = crud.create_damage_report(db=db, report=report)
     # Broadcast to connected clients
-    asyncio.create_task(manager.broadcast(json.dumps({
-        "type": "damage_report",
-        "data": {
-            "id": db_report.id,
-            "damage_type": db_report.damage_type,
-            "severity": db_report.severity,
-            "latitude": db_report.latitude,
-            "longitude": db_report.longitude
-        }
-    })))
+    try:
+        await manager.broadcast(json.dumps({
+            "type": "damage_report",
+            "data": {
+                "id": db_report.id,
+                "damage_type": db_report.damage_type,
+                "severity": db_report.severity,
+                "latitude": db_report.latitude,
+                "longitude": db_report.longitude
+            }
+        }))
+    except Exception as e:
+        print(f"Broadcast error: {e}")
     return db_report
 
 @router.get("/damage-reports/", response_model=List[schemas.DamageReport])
@@ -111,6 +114,19 @@ def update_task_status(task_id: int, status: str, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Task not found")
     return db_task
 
+@router.put("/tasks/{task_id}/assign", response_model=schemas.Task)
+def assign_resources_to_task(task_id: int, assignment: dict, db: Session = Depends(get_db)):
+    """Assign resources to a task"""
+    resource_ids = assignment.get("resource_ids", [])
+    
+    # Convert resource IDs to comma-separated string
+    resource_list = ",".join(map(str, resource_ids))
+    
+    db_task = crud.assign_resources_to_task(db, task_id=task_id, assigned_resources=resource_list)
+    if db_task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return db_task
+
 # WebSocket endpoint
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -134,5 +150,131 @@ async def agent_update(update: schemas.AgentUpdate):
         "data": update.data
     }))
     return {"status": "success"}
+
+# Agent control endpoints
+@router.post("/agents/start/{agent_type}")
+async def start_agent(agent_type: str):
+    """Start a specific agent"""
+    try:
+        # Define available agents
+        available_agents = {
+            "social_media": "social_media",
+            "damage_assessment": "damage_assessment", 
+            "resource_planning": "resource_planning"
+        }
+        
+        if agent_type not in available_agents:
+            raise HTTPException(status_code=400, detail="Invalid agent type")
+        
+        # Import and run the agent directly in a background task
+        import asyncio
+        
+        # Broadcast that agent is starting
+        await manager.broadcast(json.dumps({
+            "type": "agent_update",
+            "agent_type": agent_type,
+            "status": "starting",
+            "message": f"{agent_type.replace('_', ' ').title()} Agent is starting...",
+            "data": {"process_id": "internal"}
+        }))
+        
+        # Start the agent in background
+        if agent_type == "social_media":
+            asyncio.create_task(run_social_media_agent())
+        elif agent_type == "damage_assessment":
+            asyncio.create_task(run_damage_assessment_agent())
+        elif agent_type == "resource_planning":
+            asyncio.create_task(run_resource_planning_agent())
+        
+        return {"status": "started", "agent_type": agent_type, "process_id": "internal"}
+    except Exception as e:
+        error_msg = f"Failed to start {agent_type}: {str(e)}"
+        await manager.broadcast(json.dumps({
+            "type": "agent_update",
+            "agent_type": agent_type,
+            "status": "error",
+            "message": error_msg,
+            "data": {"error": str(e)}
+        }))
+        raise HTTPException(status_code=500, detail=error_msg)
+
+# Internal agent runner functions
+async def run_social_media_agent():
+    """Run social media agent internally"""
+    try:
+        import sys
+        import os
+        
+        # Add the backend directory to Python path
+        backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        if backend_dir not in sys.path:
+            sys.path.insert(0, backend_dir)
+        
+        from agents.social_media_agent import SocialMediaAgent
+        agent = SocialMediaAgent()
+        await agent.monitor_social_media()
+    except Exception as e:
+        await manager.broadcast(json.dumps({
+            "type": "agent_update",
+            "agent_type": "social_media",
+            "status": "error",
+            "message": f"Social Media Agent error: {str(e)}",
+            "data": {"error": str(e)}
+        }))
+
+async def run_damage_assessment_agent():
+    """Run damage assessment agent internally"""
+    try:
+        import sys
+        import os
+        
+        # Add the backend directory to Python path
+        backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        if backend_dir not in sys.path:
+            sys.path.insert(0, backend_dir)
+        
+        from agents.damage_assessment_agent import DamageAssessmentAgent
+        agent = DamageAssessmentAgent()
+        await agent.run_assessment_cycle()
+    except Exception as e:
+        await manager.broadcast(json.dumps({
+            "type": "agent_update",
+            "agent_type": "damage_assessment",
+            "status": "error",
+            "message": f"Damage Assessment Agent error: {str(e)}",
+            "data": {"error": str(e)}
+        }))
+
+async def run_resource_planning_agent():
+    """Run resource planning agent internally"""
+    try:
+        import sys
+        import os
+        
+        # Add the backend directory to Python path
+        backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        if backend_dir not in sys.path:
+            sys.path.insert(0, backend_dir)
+        
+        from agents.resource_planning_agent import ResourcePlanningAgent
+        agent = ResourcePlanningAgent()
+        await agent.run_planning_cycle()
+    except Exception as e:
+        await manager.broadcast(json.dumps({
+            "type": "agent_update",
+            "agent_type": "resource_planning",
+            "status": "error",
+            "message": f"Resource Planning Agent error: {str(e)}",
+            "data": {"error": str(e)}
+        }))
+
+@router.get("/agents/status")
+async def get_agents_status():
+    """Get status of all agents"""
+    return {
+        "social_media": "idle",
+        "damage_assessment": "idle", 
+        "resource_planning": "idle"
+    }
 
 import asyncio

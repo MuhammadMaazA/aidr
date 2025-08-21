@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import MapView from './MapView';
+import MapView from './MapView_old';
 import IncidentFeed from './IncidentFeed';
 import MissionControl from './MissionControl';
 import ActiveMissions from './ActiveMissions';
