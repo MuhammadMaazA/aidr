@@ -1,90 +1,42 @@
-.app {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: #0f172a;
-  color: white;
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
 }
 
-.app-content {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
 }
 
-/* Global styles */
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
 .card {
-  background: rgba(30, 41, 59, 0.8);
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
-  border: 1px solid rgba(51, 65, 85, 0.5);
-  backdrop-filter: blur(10px);
+  padding: 2em;
 }
 
-.button {
-  background: #3b82f6;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s;
-}
-
-.button:hover {
-  background: #2563eb;
-}
-
-.button.secondary {
-  background: #64748b;
-}
-
-.button.secondary:hover {
-  background: #475569;
-}
-
-.button.danger {
-  background: #dc2626;
-}
-
-.button.danger:hover {
-  background: #b91c1c;
-}
-
-.status-indicator {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 8px;
-}
-
-.status-active {
-  background: #10b981;
-}
-
-.status-processing {
-  background: #f59e0b;
-}
-
-.status-error {
-  background: #ef4444;
-}
-
-.status-idle {
-  background: #6b7280;
-}
-
-.severity-1, .severity-2, .severity-3 {
-  color: #10b981;
-}
-
-.severity-4, .severity-5, .severity-6 {
-  color: #f59e0b;
-}
-
-.severity-7, .severity-8, .severity-9, .severity-10 {
-  color: #ef4444;
+.read-the-docs {
+  color: #888;
 }

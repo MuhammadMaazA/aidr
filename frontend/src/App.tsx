@@ -1,28 +1,27 @@
-import React, { useEffect } from 'react'
-import MapView from './components/MapView'
-import Sidebar from './components/Sidebar'
-import Header from './components/Header'
-import { useStore } from './state/store'
-import './App.css'
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Index from "./pages/Index";
+import NotFound from "./pages/NotFound";
 
-function App() {
-  const { connectWebSocket, fetchInitialData } = useStore()
+const queryClient = new QueryClient();
 
-  useEffect(() => {
-    // Initialize the application
-    fetchInitialData()
-    connectWebSocket()
-  }, [fetchInitialData, connectWebSocket])
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 
-  return (
-    <div className="app">
-      <Header />
-      <div className="app-content">
-        <Sidebar />
-        <MapView />
-      </div>
-    </div>
-  )
-}
-
-export default App
+export default App;

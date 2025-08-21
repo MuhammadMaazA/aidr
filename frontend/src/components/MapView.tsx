@@ -1,321 +1,198 @@
-import React, { useRef, useEffect, useState } from 'react'
-import mapboxgl from 'mapbox-gl'
-import { useStore } from '../state/store'
+import React, { useEffect, useRef } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { useEmergencyStore } from '../state/emergencyStore';
 
-// You'll need to set your Mapbox token in .env.local
-// VITE_MAPBOX_TOKEN=pk.your_token_here
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoiZGVtby1hY2NvdW50IiwiYSI6ImNraDZjM3k5ZzAwMnEycXBmYW1yNGMxbjEifQ.dummy_token'
+// For demo purposes - replace with your Mapbox token
+const MAPBOX_TOKEN = 'pk.eyJ1IjoiZGVtbyIsImEiOiJjazJ0dGZ6MTcwM3VoM29tbGxrMGdoMmwwIn0.AQNHyAYDgYmBc_prgB6vVw';
 
 const MapView: React.FC = () => {
-  const mapContainer = useRef<HTMLDivElement>(null)
-  const map = useRef<mapboxgl.Map | null>(null)
-  const [lng, setLng] = useState(-74.006)
-  const [lat, setLat] = useState(40.7128)
-  const [zoom, setZoom] = useState(12)
-
-  const { damageReports, resources, tasks, selectedDisaster } = useStore()
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const { incidents, resources, damageAreas } = useEmergencyStore();
 
   useEffect(() => {
-    if (map.current) return // Initialize map only once
-    
-    // Set Mapbox access token
-    mapboxgl.accessToken = MAPBOX_TOKEN
+    if (!mapContainer.current) return;
 
+    // Initialize map
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+    
     map.current = new mapboxgl.Map({
-      container: mapContainer.current!,
-      style: 'mapbox://styles/mapbox/dark-v11', // Dark theme for disaster response
-      center: [lng, lat],
-      zoom: zoom,
-      attributionControl: false
-    })
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/dark-v11',
+      center: [-74.006, 40.7128], // NYC coordinates for demo
+      zoom: 12,
+      pitch: 45,
+    });
 
     // Add navigation controls
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
+    map.current.addControl(
+      new mapboxgl.NavigationControl({
+        visualizePitch: true,
+      }),
+      'top-right'
+    );
 
-    // Add scale control
-    map.current.addControl(new mapboxgl.ScaleControl(), 'bottom-right')
+    // Add fullscreen control
+    map.current.addControl(new mapboxgl.FullscreenControl(), 'top-right');
 
-    // Update coordinates on move
-    map.current.on('move', () => {
-      if (map.current) {
-        setLng(Number(map.current.getCenter().lng.toFixed(4)))
-        setLat(Number(map.current.getCenter().lat.toFixed(4)))
-        setZoom(Number(map.current.getZoom().toFixed(2)))
-      }
-    })
-
+    // Cleanup
     return () => {
-      if (map.current) {
-        map.current.remove()
-      }
-    }
-  }, [lng, lat, zoom])
+      map.current?.remove();
+    };
+  }, []);
 
-  // Add damage reports as markers
+  // Update incident markers
   useEffect(() => {
-    if (!map.current) return
+    if (!map.current) return;
 
-    // Remove existing damage report markers
-    const existingMarkers = document.querySelectorAll('.damage-marker')
-    existingMarkers.forEach(marker => marker.remove())
+    // Clear existing incident markers
+    const existingMarkers = document.querySelectorAll('.incident-marker');
+    existingMarkers.forEach(marker => marker.remove());
 
-    damageReports.forEach((report) => {
-      const getSeverityColor = (severity: number) => {
-        if (severity >= 7) return '#ef4444'
-        if (severity >= 4) return '#f59e0b'
-        return '#10b981'
-      }
+    // Add incident markers
+    incidents.forEach(incident => {
+      const el = document.createElement('div');
+      el.className = 'incident-marker';
+      el.style.cssText = `
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: ${getIncidentColor(incident.extractedData.urgency)};
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        cursor: pointer;
+        box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+      `;
 
-      // Create marker element
-      const el = document.createElement('div')
-      el.className = 'damage-marker'
-      el.style.width = '20px'
-      el.style.height = '20px'
-      el.style.borderRadius = '50%'
-      el.style.backgroundColor = getSeverityColor(report.severity)
-      el.style.border = '2px solid white'
-      el.style.cursor = 'pointer'
-      el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)'
-
-      // Create popup
-      const popup = new mapboxgl.Popup({ offset: 25 })
+      const popup = new mapboxgl.Popup({ offset: 15 })
         .setHTML(`
-          <div style="color: black; padding: 8px;">
-            <strong>${report.damage_type.replace('_', ' ').toUpperCase()}</strong><br/>
-            Severity: ${report.severity}/10<br/>
-            Source: ${report.source.replace('_', ' ')}<br/>
-            Confidence: ${(report.confidence * 100).toFixed(0)}%<br/>
-            ${report.verified ? '<span style="color: green;">✓ Verified</span>' : '<span style="color: orange;">⚠ Unverified</span>'}
-            ${report.description ? `<br/><br/>${report.description.substring(0, 100)}...` : ''}
+          <div class="p-3 bg-card text-card-foreground rounded-lg border border-border">
+            <h3 class="font-semibold text-sm mb-1">${incident.extractedData.incidentType}</h3>
+            <p class="text-xs text-muted-foreground mb-2">${incident.extractedData.locationString}</p>
+            <p class="text-xs">${incident.rawContent}</p>
+            <div class="flex items-center gap-2 mt-2">
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emergency-critical/20 text-emergency-critical">
+                Urgency: ${incident.extractedData.urgency}/5
+              </span>
+              ${incident.extractedData.isVerifiedSource ? 
+                '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emergency-success/20 text-emergency-success">Verified</span>' : 
+                '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emergency-warning/20 text-emergency-warning">Unverified</span>'
+              }
+            </div>
           </div>
-        `)
+        `);
 
-      // Add marker to map
       new mapboxgl.Marker(el)
-        .setLngLat([report.longitude, report.latitude])
+        .setLngLat([incident.location.lng, incident.location.lat])
         .setPopup(popup)
-        .addTo(map.current!)
-    })
-  }, [damageReports])
+        .addTo(map.current!);
+    });
+  }, [incidents]);
 
-  // Add resource markers
+  // Update resource markers
   useEffect(() => {
-    if (!map.current) return
+    if (!map.current) return;
 
-    // Remove existing resource markers
-    const existingMarkers = document.querySelectorAll('.resource-marker')
-    existingMarkers.forEach(marker => marker.remove())
+    // Clear existing resource markers
+    const existingResourceMarkers = document.querySelectorAll('.resource-marker');
+    existingResourceMarkers.forEach(marker => marker.remove());
 
-    resources.forEach((resource) => {
-      const getResourceColor = (status: string) => {
-        switch (status) {
-          case 'available': return '#10b981'
-          case 'deployed': return '#3b82f6'
-          case 'maintenance': return '#6b7280'
-          default: return '#64748b'
-        }
-      }
+    // Add resource markers
+    resources.forEach(resource => {
+      const el = document.createElement('div');
+      el.className = 'resource-marker';
+      el.style.cssText = `
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        background-color: ${getResourceColor(resource.status)};
+        border: 2px solid rgba(255, 255, 255, 0.9);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: bold;
+        color: white;
+      `;
+      el.textContent = getResourceIcon(resource.type);
 
-      const getResourceIcon = (type: string) => {
-        switch (type) {
-          case 'personnel': return '👥'
-          case 'medical': return '🏥'
-          case 'equipment': return '🚛'
-          default: return '📦'
-        }
-      }
-
-      // Create marker element
-      const el = document.createElement('div')
-      el.className = 'resource-marker'
-      el.style.width = '30px'
-      el.style.height = '30px'
-      el.style.borderRadius = '4px'
-      el.style.backgroundColor = getResourceColor(resource.status)
-      el.style.border = '2px solid white'
-      el.style.cursor = 'pointer'
-      el.style.display = 'flex'
-      el.style.alignItems = 'center'
-      el.style.justifyContent = 'center'
-      el.style.fontSize = '14px'
-      el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)'
-      el.innerHTML = getResourceIcon(resource.resource_type)
-
-      // Create popup
-      const popup = new mapboxgl.Popup({ offset: 25 })
+      const popup = new mapboxgl.Popup({ offset: 15 })
         .setHTML(`
-          <div style="color: black; padding: 8px;">
-            <strong>${resource.name}</strong><br/>
-            Type: ${resource.resource_type}<br/>
-            Status: ${resource.status}<br/>
-            Capacity: ${resource.current_load}/${resource.capacity}<br/>
-            Utilization: ${((resource.current_load / resource.capacity) * 100).toFixed(0)}%
+          <div class="p-3 bg-card text-card-foreground rounded-lg border border-border">
+            <h3 class="font-semibold text-sm mb-1">${resource.name}</h3>
+            <p class="text-xs text-muted-foreground mb-2">${resource.type}</p>
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getResourceStatusClass(resource.status)}">
+                ${resource.status}
+              </span>
+              <span class="text-xs text-muted-foreground">${resource.capabilities.personnel} personnel</span>
+            </div>
           </div>
-        `)
+        `);
 
-      // Add marker to map
       new mapboxgl.Marker(el)
-        .setLngLat([resource.longitude, resource.latitude])
+        .setLngLat([resource.currentLocation.lng, resource.currentLocation.lat])
         .setPopup(popup)
-        .addTo(map.current!)
-    })
-  }, [resources])
-
-  // Add task markers
-  useEffect(() => {
-    if (!map.current) return
-
-    // Remove existing task markers
-    const existingMarkers = document.querySelectorAll('.task-marker')
-    existingMarkers.forEach(marker => marker.remove())
-
-    tasks.forEach((task) => {
-      const getPriorityColor = (priority: number) => {
-        if (priority >= 4) return '#ef4444'
-        if (priority >= 3) return '#f59e0b'
-        return '#10b981'
-      }
-
-      const getTaskIcon = (type: string) => {
-        switch (type) {
-          case 'rescue': return '🚑'
-          case 'medical': return '🏥'
-          case 'assessment': return '🔍'
-          case 'logistics': return '📦'
-          default: return '📋'
-        }
-      }
-
-      // Only show pending and in-progress tasks
-      if (task.status === 'completed') return
-
-      // Create marker element
-      const el = document.createElement('div')
-      el.className = 'task-marker'
-      el.style.width = '25px'
-      el.style.height = '25px'
-      el.style.borderRadius = '50%'
-      el.style.backgroundColor = getPriorityColor(task.priority)
-      el.style.border = '2px solid white'
-      el.style.cursor = 'pointer'
-      el.style.display = 'flex'
-      el.style.alignItems = 'center'
-      el.style.justifyContent = 'center'
-      el.style.fontSize = '12px'
-      el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)'
-      el.innerHTML = getTaskIcon(task.task_type)
-
-      // Add pulsing animation for high priority tasks
-      if (task.priority >= 4) {
-        el.style.animation = 'pulse 2s infinite'
-      }
-
-      // Create popup
-      const popup = new mapboxgl.Popup({ offset: 25 })
-        .setHTML(`
-          <div style="color: black; padding: 8px;">
-            <strong>${task.title}</strong><br/>
-            Type: ${task.task_type}<br/>
-            Priority: ${task.priority}/5<br/>
-            Status: ${task.status}<br/>
-            ${task.estimated_duration ? `Duration: ${task.estimated_duration}min<br/>` : ''}
-            ${task.description ? `<br/>${task.description.substring(0, 100)}...` : ''}
-          </div>
-        `)
-
-      // Add marker to map
-      new mapboxgl.Marker(el)
-        .setLngLat([task.longitude, task.latitude])
-        .setPopup(popup)
-        .addTo(map.current!)
-    })
-  }, [tasks])
-
-  // Center map on selected disaster
-  useEffect(() => {
-    if (selectedDisaster && map.current) {
-      map.current.flyTo({
-        center: [selectedDisaster.longitude, selectedDisaster.latitude],
-        zoom: 14,
-        duration: 2000
-      })
-    }
-  }, [selectedDisaster])
+        .addTo(map.current!);
+    });
+  }, [resources]);
 
   return (
-    <div style={{ position: 'relative', flex: 1 }}>
-      {/* Map Container */}
-      <div
-        ref={mapContainer}
-        style={{
-          width: '100%',
-          height: '100%'
-        }}
-      />
-      
-      {/* Map Info Overlay */}
-      <div style={{
-        position: 'absolute',
-        top: '16px',
-        left: '16px',
-        background: 'rgba(15, 23, 42, 0.9)',
-        padding: '12px',
-        borderRadius: '8px',
-        border: '1px solid rgba(51, 65, 85, 0.5)',
-        backdropFilter: 'blur(10px)',
-        fontSize: '12px',
-        color: '#94a3b8'
-      }}>
-        <div>Longitude: {lng}</div>
-        <div>Latitude: {lat}</div>
-        <div>Zoom: {zoom}</div>
-      </div>
-
-      {/* Legend */}
-      <div style={{
-        position: 'absolute',
-        bottom: '16px',
-        left: '16px',
-        background: 'rgba(15, 23, 42, 0.9)',
-        padding: '12px',
-        borderRadius: '8px',
-        border: '1px solid rgba(51, 65, 85, 0.5)',
-        backdropFilter: 'blur(10px)',
-        fontSize: '12px'
-      }}>
-        <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Map Legend</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444' }} />
-          <span>High Severity Damage</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#f59e0b' }} />
-          <span>Medium Severity Damage</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#10b981' }} />
-          <span>Low Severity Damage</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <div style={{ width: '12px', height: '12px', background: '#3b82f6' }} />
-          <span>Resources</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444' }} />
-          <span>Active Tasks</span>
+    <div className="relative w-full h-full">
+      <div ref={mapContainer} className="absolute inset-0 rounded-lg" />
+      <div className="absolute top-4 left-4 bg-card/90 backdrop-blur-sm rounded-lg p-3 border border-border">
+        <h3 className="font-semibold text-sm mb-2">Live Situational Awareness</h3>
+        <div className="space-y-1 text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-emergency-critical"></div>
+            <span>High Priority Incidents</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded bg-status-active"></div>
+            <span>Available Resources</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded bg-status-pending"></div>
+            <span>Deployed Resources</span>
+          </div>
         </div>
       </div>
-
-      {/* Add CSS for pulse animation */}
-      <style>{`
-        @keyframes pulse {
-          0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-          70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-        }
-      `}</style>
     </div>
-  )
-}
+  );
+};
 
-export default MapView
+const getIncidentColor = (urgency: number): string => {
+  if (urgency >= 4) return 'hsl(var(--emergency-critical))';
+  if (urgency >= 3) return 'hsl(var(--emergency-warning))';
+  return 'hsl(var(--emergency-info))';
+};
+
+const getResourceColor = (status: string): string => {
+  switch (status) {
+    case 'available': return 'hsl(var(--status-active))';
+    case 'en_route': case 'on_site': return 'hsl(var(--status-pending))';
+    default: return 'hsl(var(--status-inactive))';
+  }
+};
+
+const getResourceIcon = (type: string): string => {
+  switch (type) {
+    case 'medical': return '🚑';
+    case 'fire': return '🚒';
+    case 'police': return '🚓';
+    case 'search_and_rescue': return '🚁';
+    default: return '📋';
+  }
+};
+
+const getResourceStatusClass = (status: string): string => {
+  switch (status) {
+    case 'available': return 'bg-status-active/20 text-status-active';
+    case 'en_route': return 'bg-status-pending/20 text-status-pending';
+    case 'on_site': return 'bg-emergency-info/20 text-emergency-info';
+    default: return 'bg-status-inactive/20 text-status-inactive';
+  }
+};
+
+export default MapView;
