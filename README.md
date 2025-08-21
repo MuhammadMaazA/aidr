@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Status: In Development](https://img.shields.io/badge/status-in_development-orange.svg)](https://github.com/your-username/project-aidr)
 
-**A multi-agent AI platform for integrated disaster response. Built for the MIT Global Agents Hackathon.**
+**A multi-agent AI platform for integrated disaster response.**
 
 
 ---
